@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import pickle
 import sys
+from sklearn.preprocessing import StandardScaler
 
 # Custom CSS from original code
 st.markdown("""
@@ -72,6 +73,24 @@ def load_model():
 
 model = load_model()
 
+
+df2 = pd.read_csv('unscaled_trainval_df.csv')
+
+# Assuming your DataFrame is called `df` and contains these columns:
+X = df2[['CREDIT_UTILIZATION_RATIO', 'AGE', 'BANK_TENURE', 'MONTHLY_INCOME']]
+
+# Initialize a scaler for each feature
+scaler_credit_utilization = StandardScaler()
+scaler_age = StandardScaler()
+scaler_bank_tenure = StandardScaler()
+scaler_monthly_income = StandardScaler()
+
+# Fit each scaler on the respective feature column
+scaler_credit_utilization.fit_transform(X[['CREDIT_UTILIZATION_RATIO']])
+scaler_age.fit_transform(X[['AGE']])
+scaler_bank_tenure.fit_transform(X[['BANK_TENURE']])
+scaler_monthly_income.fit_transform(X[['MONTHLY_INCOME']])
+
 # Create the Streamlit app
 st.title('🏦 MSME Loan Approval Prediction')
 st.markdown("This application predicts loan approvals based on various customer factors")
@@ -97,39 +116,42 @@ def get_user_input():
         with col1:
             credit_balance = st.number_input(
                 'Current Credit Card Balance (PHP)',
-                min_value=0,
                 value=st.session_state.input_dict.get('credit_balance', 0),
                 help="Total outstanding balance on credit cards",
                 key='credit_balance'
             )
             credit_limit = st.number_input(
                 'Total Credit Card Limit (PHP)',
-                min_value=1,
                 value=st.session_state.input_dict.get('credit_limit', 1),
                 help="Total credit limit across all credit cards",
                 key='credit_limit'
             )
             
-            # Calculate credit utilization ratio
-            st.session_state.input_dict['CREDIT_UTILIZATION_RATIO'] = credit_balance / credit_limit
             
+            # Calculate credit utilization ratio
+            st.session_state.input_dict['CREDIT_UTILIZATION_RATIO_unscale'] = credit_balance / credit_limit 
+            st.session_state.input_dict['CREDIT_UTILIZATION_RATIO'] = scaler_credit_utilization.transform([[st.session_state.input_dict['CREDIT_UTILIZATION_RATIO_unscale']]]).tolist()[0][0]
+            
+            
+
             monthly_income = st.number_input(
                 'Monthly Income (PHP)', 
-                min_value=0,
-                value=st.session_state.input_dict.get('MONTHLY_INCOME', 0),
+                value=st.session_state.input_dict.get('MONTHLY_INCOME_unscale', 0),
                 help="Monthly income in local currency",
                 key='monthly_income'
             )
-            st.session_state.input_dict['MONTHLY_INCOME'] = monthly_income
+            st.session_state.input_dict['MONTHLY_INCOME_unscale'] = monthly_income
+            st.session_state.input_dict['MONTHLY_INCOME'] = scaler_monthly_income.transform([[st.session_state.input_dict['MONTHLY_INCOME_unscale']]]).tolist()[0][0]
+
             
             bank_tenure = st.number_input(
                 'Bank Tenure (years)', 
-                min_value=0,
-                value=st.session_state.input_dict.get('BANK_TENURE', 0),
+                value=st.session_state.input_dict.get('BANK_TENURE_unscale', 0),
                 help="Number of years as a bank customer",
                 key='bank_tenure'
             )
-            st.session_state.input_dict['BANK_TENURE'] = bank_tenure
+            st.session_state.input_dict['BANK_TENURE_unscale'] = bank_tenure
+            st.session_state.input_dict['BANK_TENURE'] = scaler_bank_tenure.transform([[st.session_state.input_dict['BANK_TENURE_unscale']]]).tolist()[0][0]
         
         with col2:
             # Account Indicators
@@ -169,13 +191,12 @@ def get_user_input():
         with col3:
             age = st.number_input(
                 'Age', 
-                min_value=18, 
-                max_value=100,
-                value=st.session_state.input_dict.get('AGE', 18),
+                value=st.session_state.input_dict.get('AGE_unscale', 18),
                 help="Age in years",
                 key='age'
             )
-            st.session_state.input_dict['AGE'] = age
+            st.session_state.input_dict['AGE_unscale'] = age
+            st.session_state.input_dict['AGE'] = scaler_age.transform([[st.session_state.input_dict['AGE_unscale']]]).tolist()[0][0]
             
             gender = st.selectbox('Gender', ['Female', 'Male'], 
                                 index=1 if st.session_state.input_dict.get('GENDER_MALE', False) else 0,
@@ -318,6 +339,8 @@ expected_features = ['CREDIT_UTILIZATION_RATIO', 'AGE', 'BANK_TENURE', 'MONTHLY_
 
 input_df = pd.DataFrame([user_input])
 input_df = input_df.reindex(columns=expected_features, fill_value=0)
+
+
 
 # Add prediction button
 if st.button('Predict Loan Approval'):
